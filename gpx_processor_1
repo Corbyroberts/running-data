@@ -1,0 +1,125 @@
+from xml.etree import ElementTree
+import math,time,datetime
+from decimal import Decimal
+lat=[]
+lon=[]
+pt_time=[]
+pt_date=[]
+leg_distance=[]
+leg_bearing=[]
+delta_time=[]
+leg_minutes=[]
+pace_calc=[]
+x=0
+lat1=0
+lat2=0
+lon1=0
+lon2=0
+tot_dist=0
+tot_time=0
+
+def haversine(lat1, lon1, lat2, lon2):
+  R = 3961
+  # In miles
+  dLat = math.radians(lat2 - lat1)
+  dLon = math.radians(lon2 - lon1)
+  lat1 = math.radians(lat1)
+  lat2 = math.radians(lat2)
+ 
+  a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.sin(dLon / 2) * math.sin(dLon / 2) * math.cos(lat1) * math.cos(lat2)
+  c = 2 * math.asin(math.sqrt(a))
+  return R * c
+def calcBearing(lat1, lon1, lat2, lon2):
+  dLon = lon2 - lon1
+  y = math.sin(dLon) * math.cos(lat2)
+  x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon)
+  return math.atan2(y, x)
+print 'data point,leg_distance,leg_bearing,leg_minutes,pace_calc,tot_dist,tot_time'
+if __name__ == "__main__":
+  namespace = "http://www.topografix.com/GPX/1/1"
+	tree = ElementTree.parse("/home/corbyr/example.gpx")
+	root = tree.getroot()
+	trackSegments = root.getiterator("{%s}trkseg" % namespace)
+	for trackSegment in trackSegments:
+			for trackPoint in trackSegment:
+				#print x
+				#print trackPoint.attrib
+				#print trackPoint.attrib['lat']
+				lat.append(float(trackPoint.attrib['lat']))
+				#print trackPoint.attrib['lon']
+				lon.append(float(trackPoint.attrib['lon']))
+				#print trackPoint.find('{%s}ele'% namespace).text
+				#print trackPoint.find('{%s}time'% namespace).text
+				
+				#pt_time.append(trackPoint.find('{%s}time'% namespace).text)
+				ut_time=trackPoint.find('{%s}time'% namespace).text
+				#this one splits at the "T" between the date and time
+				t_time=ut_time.split('T')
+				#this is zulu time still has z attached
+				pt_time.append(t_time[1])
+				#this one removes the z in a really stupid way
+				pt_time[x]=pt_time[x].split('Z')[0]
+				#this is thedate - certainly onlt need one of these --made this hard by splitting--could have done only with strptime
+				pt_date.append(t_time[0])
+				pt_time[x]=time.strptime(pt_date[x]+'-'+pt_time[x], '%Y-%m-%d-%H:%M:%S')
+				t=pt_time[x]
+				t2=pt_time[x-1]
+				#print t,t2
+				#print t.tm_sec,t2.tm_sec
+				t_h=float(time.struct_time(t)[3])
+				t_m=float(time.struct_time(t)[4])
+				t_s=float(time.struct_time(t)[5])
+				t2_h=float(time.struct_time(t2)[3])
+				t2_m=float(time.struct_time(t2)[4])
+				t2_s=float(time.struct_time(t2)[5])
+				t_to_m=t_h*60+t_m+t_s/60
+				t2_to_m=t2_h*60+t2_m+t2_s/60
+				t_delta=Decimal(t_to_m-t2_to_m)
+				if x<1:
+					st_time=t_to_m
+				
+				
+				
+				#print 't_to_m',t_to_m
+				#print 't2_to_m',t2_to_m
+				#print 't_delta',t_delta
+				#print t
+				t=(t.tm_min)+((t.tm_sec)/60)
+				t2=float((t2.tm_sec))
+				#print 't',t,'t2',t2
+				leg_minutes.append(t_to_m-t2_to_m)
+				
+				#delta_time.append(time.strptime(pt_time[x],[5])-(time.strptime(pt_time[x-1],[5])
+				#print delta_time[x]
+				#print lat
+				#print lat[x]
+				leg_distance.append(haversine(lat[x-1],lon[x-1],lat[x],lon[x]))
+				l_d=Decimal((haversine(lat[x-1],lon[x-1],lat[x],lon[x])))
+				# the +180%360 part is to make bearing 0 to 360
+				leg_bearing.append((math.degrees(calcBearing(lat[x-1], lon[x-1], lat[x], lon[x]))+180)%360)
+				
+				if leg_distance[x]>0:
+					if t_delta>0:
+						pace_calc.append(Decimal(t_delta)/Decimal(leg_distance[x]))
+					else:
+						pace_calc.append(0)
+				else:
+					pace_calc.append(0)
+				tot_dist=tot_dist+leg_distance[x]
+				tot_time=tot_time+t_delta
+				print x ,',',leg_distance[x],',',leg_bearing[x],',',leg_minutes[x],',',pace_calc[x],',',tot_dist,',',tot_time
+				#print 'bearing',leg_bearing[x]
+				#print 'pace_calc',pace_calc[x]
+				#print 'total dist',tot_dist
+				#print leg_minutes[x]
+				
+				x=x+1
+#Print 'total distance',tot_dist
+#print 'total cumulative time',tot_time
+calc_time=t_to_m-st_time
+#print 'Calc time final-start',calc_time
+#print 'finalx',x
+#print haversine(lat[6], lon[6], lat[7], lon[7])
+#print math.degrees(calcBearing(lat[6], lon[6], lat[7], lon[7]))
+
+
